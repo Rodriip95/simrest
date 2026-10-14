@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/space.test.mjs src/features/restaurant/state/sessionStore.test.ts src/features/restaurant/domain/permissions.test.ts src/features/restaurant/domain/movement.test.ts src/features/restaurant/domain/assignments.test.ts src/features/restaurant/domain/visits.test.ts",
+    "test": "node --experimental-transform-types --test tests/space.test.mjs src/features/restaurant/state/sessionStore.test.ts src/features/restaurant/domain/permissions.test.ts src/features/restaurant/domain/movement.test.ts src/features/restaurant/domain/assignments.test.ts src/features/restaurant/domain/visits.test.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
+    "lucide-react": "^1.56.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.186.1",

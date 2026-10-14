@@ -1,8 +1,14 @@
 import { useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { LayoutGrid, Eye, UtensilsCrossed, AlertTriangle, RefreshCw } from 'lucide-react'
 import type { Role } from '../domain/types'
 import { viewLabels } from '../domain/permissions'
 import { DomainError } from '../domain/commands'
 import { useSessionStore } from '../state/useSessionStore'
+import HudButton from './hud/HudButton'
+import HudSelect from './hud/HudSelect'
+
+const roleIcons: Record<Role, LucideIcon> = { admin: LayoutGrid, supervisor: Eye, waiter: UtensilsCrossed }
 
 export default function RoleNavigation() {
   const session = useSessionStore(state => state.session)
@@ -24,30 +30,31 @@ export default function RoleNavigation() {
   }
 
   return (
-    <section className="role-navigation" aria-label="Modo demo">
-      <div><strong>Modo demo</strong><p>Los roles comparten la misma sesión local.</p></div>
-      <nav aria-label="Vistas por rol">
+    <section className="role-hud" aria-label="Modo demo">
+      <nav className="role-segment" aria-label="Vistas por rol">
         {(Object.keys(viewLabels) as Role[]).map(role => (
-          <button key={role} type="button" aria-current={session.activeRole === role ? 'page' : undefined}
+          <HudButton key={role} icon={roleIcons[role]} label={viewLabels[role]}
+            current={session.activeRole === role} active={session.activeRole === role}
             disabled={role === 'waiter' && activeWaiters.length === 0}
-            onClick={() => change(role, role === 'waiter' ? session.activeWaiterId ?? activeWaiters[0]?.id ?? null : null)}>
-            {viewLabels[role]}
-          </button>
+            onClick={() => change(role, role === 'waiter' ? session.activeWaiterId ?? activeWaiters[0]?.id ?? null : null)} />
         ))}
       </nav>
       {session.activeRole === 'waiter' && (
-        <label>Mozo activo
-          <select value={session.activeWaiterId ?? ''} onChange={event => change('waiter', event.target.value)}>
-            {activeWaiters.map(waiter => <option key={waiter.id} value={waiter.id}>{waiter.name}</option>)}
-          </select>
-        </label>
+        <HudSelect id="active-waiter" label="Mozo" value={session.activeWaiterId ?? ''}
+          options={activeWaiters.map(waiter => ({ value: waiter.id, label: waiter.name }))}
+          onChange={value => change('waiter', value)} />
       )}
-      {pending && <div className="draft-warning" role="alert">
-        <p>Hay un pedido sin confirmar. ¿Querés descartarlo para cambiar de vista?</p>
-        <button type="button" onClick={() => setPending(null)}>Seguir editando</button>
-        <button type="button" onClick={() => change(pending.role, pending.waiterId, true)}>Descartar y cambiar</button>
+      {pending && <div className="hud-alert" role="alert">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <div>
+          <p>Hay un pedido sin confirmar. ¿Querés descartarlo para cambiar de vista?</p>
+          <div className="hud-alert-actions">
+            <button type="button" onClick={() => setPending(null)}><RefreshCw size={14} aria-hidden="true" /> Seguir editando</button>
+            <button type="button" className="is-danger" onClick={() => change(pending.role, pending.waiterId, true)}>Descartar y cambiar</button>
+          </div>
+        </div>
       </div>}
-      <p className="form-error" role="alert">{error}</p>
+      {error && <p className="hud-alert hud-alert-error" role="alert">{error}</p>}
     </section>
   )
 }

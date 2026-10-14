@@ -7,3 +7,7 @@ const sessionStore = createSessionStore()
 export function useSessionStore<T>(selector: (state: SessionState) => T): T {
   return useStore(sessionStore, selector)
 }
+
+export function createCommandId() {
+  return crypto.randomUUID()
+}

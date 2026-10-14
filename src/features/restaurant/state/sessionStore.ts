@@ -3,20 +3,26 @@ import { buildSpace } from '../../supervisor/domain/space.ts'
 import { createCatalog, createWaiters } from '../data/mocks.ts'
 import { DomainError } from '../domain/commands.ts'
 import type { SessionCommandContracts } from '../domain/commands.ts'
-import type { Role, SessionData, TransientState } from '../domain/types.ts'
+import type { OrderDraft, Role, SessionData, TransientState } from '../domain/types.ts'
 import { selectActiveVisit } from './selectors.ts'
 import { requirePermission } from '../domain/permissions.ts'
 import { validatePlacement, snapCoordinate } from '../domain/movement.ts'
 import { validateAssignment } from '../domain/assignments.ts'
 import { isVisitCommandRetry, resizeCustomerIds, validateGuestCount } from '../domain/visits.ts'
+import { buildOrderItemsFromDraft, ensureOrderDraft, getOrderDraft, isOrderConfirmedRetry, isOrderDeliveredRetry } from '../domain/orders.ts'
 
 type Dependencies = { now: () => number; createId: () => string }
-type SessionActions = Pick<SessionCommandContracts, 'deleteTable' | 'resetSession' | 'moveTable' | 'assignTable' | 'setCapacity' | 'openVisit' | 'updateGuestCount'> & {
+type SessionActions = Pick<SessionCommandContracts, 'deleteTable' | 'resetSession' | 'moveTable' | 'assignTable' | 'setCapacity' | 'openVisit' | 'updateGuestCount' | 'confirmOrder' | 'deliverOrder'> & {
   beginMove: (tableId: string) => void
   previewMove: (x: number, z: number) => void
   cancelMove: () => void
   selectTable: (tableId: string | null, discardDrafts?: boolean) => void
   switchRole: (role: Role, waiterId?: string | null, discardDrafts?: boolean) => void
+  ensureOrderDraftForVisit: (visitId: string) => OrderDraft
+  ensureOrderDraft: (visitId: string, productId: string) => void
+  setOrderLineQuantity: (visitId: string, productId: string, quantity: number) => void
+  setOrderLineNote: (visitId: string, productId: string, note: string) => void
+  removeOrderLine: (visitId: string, productId: string) => void
 }
 export type SessionState = SessionData & { transient: TransientState } & SessionActions
 
@@ -200,6 +206,54 @@ export function createSessionStore(dependencies: Partial<Dependencies> = {}) {
         transient: emptyTransient(),
       })
     },
+    ensureOrderDraftForVisit(visitId) {
+      const state = get()
+      if (!Object.hasOwn(state.visits, visitId)) throw new DomainError('NOT_FOUND', 'La visita no existe.')
+      const draft = ensureOrderDraft(state.transient, visitId, createId)
+      if (draft !== state.transient.orderDrafts[visitId]) {
+        set({ transient: { ...state.transient, orderDrafts: { ...state.transient.orderDrafts, [visitId]: draft } } })
+      }
+      return draft
+    },
+    ensureOrderDraft(visitId, productId) {
+      const state = get()
+      if (!Object.hasOwn(state.products, productId)) throw new DomainError('NOT_FOUND', 'El producto no existe.')
+      const product = state.products[productId]
+      const draft = ensureOrderDraft(state.transient, visitId, createId)
+      if (!draft.items.some(item => item.productId === productId)) {
+        const updated: OrderDraft = { ...draft, items: [...draft.items, { productId, quantity: 1, note: '' }] }
+        set({ transient: { ...state.transient, orderDrafts: { ...state.transient.orderDrafts, [visitId]: updated } } })
+      }
+      const prod = state.products[productId]
+      if (prod && !prod.available) throw new DomainError('INVALID_INPUT', 'El producto no está disponible.')
+    },
+    setOrderLineQuantity(visitId, productId, quantity) {
+      const state = get()
+      const draft = getOrderDraft(state.transient, visitId)
+      const product = state.products[productId]
+      if (!product) throw new DomainError('NOT_FOUND', 'El producto no existe.')
+      const line = draft.items.find(item => item.productId === productId)
+      if (!line) throw new DomainError('NOT_FOUND', 'El producto no está en el borrador.')
+      const q = Math.trunc(quantity)
+      if (!Number.isInteger(q) || q < 1 || q > 99) throw new DomainError('INVALID_INPUT', 'La cantidad debe ser entre 1 y 99.')
+      const updated: OrderDraft = { ...draft, items: draft.items.map(item => item.productId === productId ? { ...item, quantity: q } : item) }
+      set({ transient: { ...state.transient, orderDrafts: { ...state.transient.orderDrafts, [visitId]: updated } } })
+    },
+    setOrderLineNote(visitId, productId, note) {
+      const state = get()
+      const draft = getOrderDraft(state.transient, visitId)
+      const line = draft.items.find(item => item.productId === productId)
+      if (!line) throw new DomainError('NOT_FOUND', 'El producto no está en el borrador.')
+      if (note.length > 200) throw new DomainError('INVALID_INPUT', 'La observación no puede superar los 200 caracteres.')
+      const updated: OrderDraft = { ...draft, items: draft.items.map(item => item.productId === productId ? { ...item, note } : item) }
+      set({ transient: { ...state.transient, orderDrafts: { ...state.transient.orderDrafts, [visitId]: updated } } })
+    },
+    removeOrderLine(visitId, productId) {
+      const state = get()
+      const draft = getOrderDraft(state.transient, visitId)
+      const updated: OrderDraft = { ...draft, items: draft.items.filter(item => item.productId !== productId) }
+      set({ transient: { ...state.transient, orderDrafts: { ...state.transient.orderDrafts, [visitId]: updated } } })
+    },
     deleteTable(tableId) {
       const state = get()
       // Keep repeated deletion a no-op for authorized roles, as in B02.
@@ -229,6 +283,71 @@ export function createSessionStore(dependencies: Partial<Dependencies> = {}) {
         events: [...state.events, {
           id: createId(), commandId: createId(), sessionId: state.session.id, type: 'table.deleted',
           actorId: state.session.activeRole, entityId: tableId, occurredAt, payload: { tableNumber: table.number },
+        }],
+      })
+    },
+    confirmOrder({ visitId, commandId }) {
+      const state = get()
+      if (!Object.hasOwn(state.visits, visitId)) throw new DomainError('NOT_FOUND', 'La visita no existe.')
+      const visit = state.visits[visitId]
+      if (visit.closedAt !== null) throw new DomainError('CONFLICT', 'La visita ya finalizó.')
+      requirePermission(state, 'confirmOrder', visit.tableId)
+      if (isOrderConfirmedRetry(state, commandId, visitId)) return
+      const draft = state.transient.orderDrafts[visitId]
+      if (!draft) throw new DomainError('INVALID_INPUT', 'No hay borrador para esta visita.')
+      const items = buildOrderItemsFromDraft(draft, state.products)
+      if (items.length === 0) throw new DomainError('INVALID_INPUT', 'El pedido no puede estar vacío.')
+      const occurredAt = timestamp()
+      const assignment = Object.values(state.assignments).find(a => a.tableId === visit.tableId && a.endedAt === null)
+      const waiterIdAtConfirmation = assignment?.waiterId ?? state.session.activeWaiterId ?? state.session.activeRole
+      const actorId = state.session.activeWaiterId ?? state.session.activeRole
+      const orderId = createId()
+      set({
+        orders: {
+          ...state.orders,
+          [orderId]: {
+            id: orderId,
+            commandId,
+            visitId,
+            tableId: visit.tableId,
+            actorId,
+            waiterIdAtConfirmation,
+            items: Object.freeze(items.map(i => ({ ...i }))),
+            confirmedAt: occurredAt,
+            status: 'confirmed',
+            deliveredAt: null,
+          },
+        },
+        transient: {
+          ...state.transient,
+          orderDrafts: { ...state.transient.orderDrafts, [visitId]: { ...draft, items: [] } },
+        },
+        events: [...state.events, {
+          id: createId(), commandId, sessionId: state.session.id, type: 'order.confirmed',
+          actorId, entityId: visitId, occurredAt, payload: { orderId, tableId: visit.tableId },
+        }],
+      })
+    },
+    deliverOrder({ orderId, commandId }) {
+      const state = get()
+      if (!Object.hasOwn(state.orders, orderId)) throw new DomainError('NOT_FOUND', 'El pedido no existe.')
+      const order = state.orders[orderId]
+      if (order.status === 'delivered') {
+        if (isOrderDeliveredRetry(state, commandId, orderId)) return
+        throw new DomainError('CONFLICT', 'El pedido ya fue entregado.')
+      }
+      const visit = state.visits[order.visitId]
+      if (!visit || visit.closedAt !== null) throw new DomainError('CONFLICT', 'La visita ya finalizó.')
+      requirePermission(state, 'deliverOrder', order.tableId)
+      const occurredAt = timestamp()
+      set({
+        orders: {
+          ...state.orders,
+          [orderId]: { ...order, status: 'delivered', deliveredAt: occurredAt },
+        },
+        events: [...state.events, {
+          id: createId(), commandId, sessionId: state.session.id, type: 'order.delivered',
+          actorId: state.session.activeWaiterId ?? state.session.activeRole, entityId: orderId, occurredAt, payload: { visitId: order.visitId, tableId: order.tableId },
         }],
       })
     },

@@ -58,9 +58,9 @@ yarn build
 yarn preview
 ```
 
-Las pruebas usan el runner integrado de Node 24, sin dependencias adicionales. `yarn test` ejecuta `node --test tests/space.test.mjs src/features/restaurant/state/sessionStore.test.ts src/features/restaurant/domain/permissions.test.ts`. Cubren distribución, eliminación, referencias, números estables, errores sin mutaciones, eventos atómicos, reloj no decreciente, limpieza al reiniciar, aislamiento entre sesiones, permisos y navegación con borradores. Los tests TypeScript se comprueban con la configuración Node; el código de aplicación, con la del navegador. Ambas usan `strict` explícito.
+Las pruebas usan el runner integrado de Node, sin dependencias adicionales. `yarn test` ejecuta `node --experimental-transform-types --test` sobre los seis archivos de prueba (espacio, sesión, permisos, movimiento, asignaciones y visitas). El flag habilita la ejecución directa de TypeScript en Node 22.7+ y sigue siendo válido en Node 24, donde el stripping ya viene activo por defecto. Cubren distribución, eliminación, referencias, números estables, errores sin mutaciones, eventos atómicos, reloj no decreciente, limpieza al reiniciar, aislamiento entre sesiones, permisos, navegación con borradores, movimiento, asignaciones y visitas. Los tests TypeScript se comprueban con la configuración Node; el código de aplicación, con la del navegador. Ambas usan `strict` explícito.
 
-Validación P02 (13/10/2026): 15 pruebas aprobadas, `yarn lint` y `yarn build` correctos. Vite advierte de un bundle mayor a 500 kB. Los roles, teclado, fallback sin WebGL, confirmación, gestos, humo y cámara siguen pendientes de validación visual: no hubo navegador disponible en la herramienta de UI de la sesión. No hay pruebas DOM/WebGL automatizadas.
+Validación del 13/10/2026: 27 pruebas aprobadas, `yarn lint` y `yarn build` correctos (aviso conocido de Vite por bundle mayor a 500 kB). Los roles, teclado, fallback sin WebGL, confirmación, gestos, humo y cámara siguen pendientes de validación visual: no hubo navegador disponible en la sesión. No hay pruebas DOM/WebGL automatizadas. El entorno de esta máquina usa Node 22.16; con Node 22.6–22.16 el flag es necesario y con Node 24 es redundante pero inocuo.
 
 ## Alcance y estructura
 
