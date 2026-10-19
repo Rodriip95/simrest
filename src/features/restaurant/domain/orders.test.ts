@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildOrderItemsFromDraft, computeTotals, isOrderConfirmedRetry, isOrderDeliveredRetry, MIN_ORDER_QUANTITY, MAX_ORDER_QUANTITY, validateOrderLine } from './orders.ts'
+import { computeTotals, isOrderConfirmedRetry, validateOrderLine } from './orders.ts'
 import { createSessionStore } from '../state/sessionStore.ts'
 import { DomainError } from './commands.ts'
 
@@ -60,11 +60,13 @@ test('confirmOrder crea pedido, limpia borrador y es idempotente', () => {
 
 test('confirmOrder requiere permiso y no permite vacío', () => {
   const store = createSessionStore({ now, createId: createId() })
-  store.getState().switchRole('waiter', 'ana')
   store.getState().assignTable({ tableId: 'table-1', waiterId: 'ana', confirmOccupied: false, discardDraft: true, commandId: 'a1' })
   store.getState().openVisit({ tableId: 'table-1', guestCount: 1, commandId: 'v1' })
   const v = Object.values(store.getState().visits)[0]
+  store.getState().switchRole('waiter', 'ana')
   assert.throws(() => store.getState().confirmOrder({ visitId: v.id, commandId: 'o2' }), DomainError) // sin borrador
+  store.getState().switchRole('waiter', 'bruno')
+  assert.throws(() => store.getState().confirmOrder({ visitId: v.id, commandId: 'o3' }), DomainError)
 })
 
 test('deliverOrder marca entregado y es idempotente', () => {

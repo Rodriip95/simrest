@@ -1,5 +1,5 @@
 export type DomainErrorCode = 'NOT_FOUND' | 'FORBIDDEN' | 'INVALID_INPUT' | 'TABLE_OCCUPIED'
-  | 'CONFLICT' | 'UNASSIGNED' | 'PENDING_ORDERS' | 'UNRESOLVED_DRAFT'
+  | 'CONFLICT' | 'UNASSIGNED' | 'PENDING_ORDERS' | 'UNRESOLVED_DRAFT' | 'CONFIRMATION_REQUIRED'
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode

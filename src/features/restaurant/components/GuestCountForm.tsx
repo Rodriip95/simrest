@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { useSessionStore } from '../state/useSessionStore'
 import { selectActiveVisit } from '../state/selectors'
 import { can } from '../domain/permissions'
+import SpeechGuestCount from './SpeechGuestCount'
+import CloseVisitControl from './CloseVisitControl'
+import VisitTimer from './VisitTimer'
 
-export default function GuestCountForm({ tableId }: { tableId: string }) {
+export default function GuestCountForm({ tableId, now }: { tableId: string; now: number }) {
   const state = useSessionStore(state => state)
   const table = state.tables[tableId]
   const visit = selectActiveVisit(state, tableId)
@@ -16,6 +19,7 @@ export default function GuestCountForm({ tableId }: { tableId: string }) {
   return <section className="guest-panel" aria-label="Clientes de la mesa">
     <h4>{visit ? 'Clientes presentes' : 'Ingresar clientes'}</h4>
     <p>{visit?.guestCount ?? 0}/{table.capacity} clientes</p>
+    {visit && <p><VisitTimer visit={visit} now={now} /></p>}
     {allowed ? <form onSubmit={event => {
       event.preventDefault()
       try {
@@ -30,6 +34,7 @@ export default function GuestCountForm({ tableId }: { tableId: string }) {
       <label htmlFor="guest-count">Cantidad de clientes</label>
       <input id="guest-count" type="number" min="1" max={table.capacity} step="1" value={count}
         onChange={event => { setCount(event.target.value); setError(''); setNotice('') }} />
+      <SpeechGuestCount onCount={value => { setCount(String(value)); setError(''); setNotice('') }} />
       <button type="submit">{visit ? 'Guardar cantidad' : 'Confirmar ingreso'}</button>
     </form> : <p>Asigná un mozo activo para ingresar clientes.</p>}
     {!visit && can(state, 'setCapacity', tableId) && <form onSubmit={event => {
@@ -46,6 +51,7 @@ export default function GuestCountForm({ tableId }: { tableId: string }) {
         onChange={event => { setCapacity(event.target.value); setError(''); setNotice('') }} />
       <button type="submit">Guardar capacidad</button>
     </form>}
+    {visit && can(state, 'closeVisit', tableId) && <CloseVisitControl visitId={visit.id} />}
     <p role="alert" className="form-error">{error}</p>
     <p role="status" className="form-notice">{notice}</p>
   </section>

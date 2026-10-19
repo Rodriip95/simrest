@@ -152,3 +152,24 @@ Esta revisión cambia documentación y presentación. No implementa estas funcio
 P01–P02: dominio y roles. P03–P04: mover y asignar. P05–P06: visitas manuales y voz. P07–P08: pedidos y avatares. P09–P10: cierre e indicadores. P11: recorrido y medición. Dependencias exactas en TASKS.
 
 P12 reserva backend, persistencia, identidad, permisos reales, concurrencia, cocina y caja. La visión previa de monolito modular y base relacional queda como hipótesis futura, sin fijar proveedor. Aislamiento por local, idempotencia y eventos confirmados serán requisitos antes de operar datos reales. La demo no depende de esa etapa.
+
+## 12. Revisión de UI — 14/10/2026
+
+Esta revisión orienta la navegación hacia un salón que ocupa toda la ventana, con controles superiores e inferiores y paneles deslizantes bajo demanda. Prevalece sobre referencias anteriores a un detalle o listado fijo debajo de la escena.
+
+- Seleccionar una mesa muestra acciones contextuales inferiores según rol y estado. Abrir un formulario requiere elegir una acción; cerrar el formulario mantiene selección y borrador. Deseleccionar libera atención y requiere resolver el borrador.
+- Seleccionar un mozo permite inspeccionar asignaciones, abrir mesas y consultar atención simulada. Hay alternativa HTML en Mozos. En Mi servicio se restringe al mozo activo.
+- Los clientes activos se muestran como esferas y los mozos como cubos pequeños. Los colores de mesa indican libre/ocupada; el celeste distingue selección.
+- La atención se vincula a la selección de mesa propia. Cambiar a Supervisor conserva la ubicación como snapshot; no representa seguimiento real. Cerrar únicamente el formulario no deselecciona la mesa.
+- Cámara y geometría comparten toda la ventana; abrir paneles no redimensiona ni recrea el canvas. Movimiento confirmado conserva encuadre y reconstrucción lo restablece.
+- Etiquetas de mesas/mozos se proyectan a una capa DOM del árbol principal en cada frame solicitado, sin raíces React independientes ni mutaciones del dominio por frame.
+
+Estado comprobado inicialmente en U01: UI contextual, directorios, formularios de asignación/clientes/pedidos, avatares, snapshot y fallback. P06, P09 y P10 se incorporaron después; quedan pendientes presencia con eventos propios y medición máxima. Evidencia y comandos en README y TASKS.
+
+## 13. Salón de varios pisos
+
+El salón admite varios pisos dentro de una misma sesión. Cada piso define ID estable, nombre, orden y superficie; cada mesa pertenece a exactamente un piso y conserva un ID global único aunque el número visible se repita. La planta baja conserva el recorrido inicial. Movimiento, bordes y separación se validan dentro del piso de la mesa. El selector de nivel filtra escena y directorio; cambiarlo no interrumpe visitas, contadores, pedidos, asignaciones ni presencia. Los borradores se resuelven explícitamente antes de cambiar. La administración puede agregar, renombrar y reordenar pisos. No se elimina el último piso ni uno con visitas activas; si existe historial o asignaciones, se exige confirmación, se preservan visitas y pedidos cerrados y se finalizan asignaciones activas. Los IDs de pisos eliminados no se reutilizan durante la sesión. Mozos pueden tener mesas en varios niveles; su ficha indica el piso de la mesa atendida. Métricas globales cubren todos los niveles y admiten filtro por piso.
+
+## 14. Tiempo de atención por mesa
+
+El contador de una mesa ocupada nace al confirmar el ingreso de comensales (`Visit.openedAt`) y termina en `Visit.closedAt`. La duración se calcula a partir de esos timestamps, nunca se persiste por segundo. Se muestra en la etiqueta de la mesa en escena, en la barra contextual y en la lista/formulario HTML. Se actualiza una vez por segundo mientras la vista está abierta; el canvas conserva render bajo demanda. Cerrar libera la mesa y elimina su contador activo. Una visita posterior empieza un contador nuevo. Reasignar mozo o confirmar pedidos no lo reinicia. La duración total de atención es distinta de la espera al primer pedido de §8.

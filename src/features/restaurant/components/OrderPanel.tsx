@@ -1,9 +1,10 @@
-import { FormEvent, useId, useMemo, useState } from 'react'
+import { useId, useState } from 'react'
+import type { FormEvent } from 'react'
 import { createCommandId, useSessionStore } from '../state/useSessionStore'
-import { selectCatalogArray, selectHasUnresolvedDraft, selectTableDetail } from '../state/selectors'
+import { selectActiveVisit } from '../state/selectors'
 import { MIN_ORDER_QUANTITY, MAX_ORDER_QUANTITY } from '../domain/orders'
 import { DomainError } from '../domain/commands'
-import { requirePermission } from '../domain/permissions'
+import { can } from '../domain/permissions'
 
 type OrderPanelProps = {
   tableId: string
@@ -17,31 +18,15 @@ function quantityError(quantity: number) {
 }
 
 export default function OrderPanel({ tableId }: OrderPanelProps) {
-  const catalog = useSessionStore(state => selectCatalogArray(state))
-  const detail = useSessionStore(state => selectTableDetail(state, tableId))
-  const visitId = detail.visit?.id ?? null
-  const orderDrafts = useSessionStore(state => state.transient.orderDrafts)
-  const draft = visitId ? orderDrafts[visitId] : undefined
-  const createDraftLine = useSessionStore(state => {
-    if (!visitId) return null
-    return (productId: string) => state.ensureOrderDraft(visitId, productId)
-  })
-  const updateDraftQuantity = useSessionStore(state => {
-    if (!visitId) return null
-    return (productId: string, quantity: number) => state.setOrderLineQuantity(visitId, productId, quantity)
-  })
-  const updateDraftNote = useSessionStore(state => {
-    if (!visitId) return null
-    return (productId: string, note: string) => state.setOrderLineNote(visitId, productId, note)
-  })
-  const removeDraftLine = useSessionStore(state => {
-    if (!visitId) return null
-    return (productId: string) => state.removeOrderLine(visitId, productId)
-  })
-  const confirmOrder = useSessionStore(state => (visitId ? (commandId: string) => state.confirmOrder({ visitId, commandId }) : null))
-  const deliverOrder = useSessionStore(state => (orderId: string, commandId: string) => state.deliverOrder({ orderId, commandId }))
-  const ensureOrderDraftForVisit = useSessionStore(state => (vId: string) => state.ensureOrderDraftForVisit(vId))
-  const hasDraft = useSessionStore(state => visitId ? selectHasUnresolvedDraft(state, visitId) : false)
+  const state = useSessionStore(state => state)
+  const catalog = Object.values(state.products)
+  const visit = selectActiveVisit(state, tableId)
+  const visitId = visit?.id
+  const draft = visitId ? state.transient.orderDrafts[visitId] : undefined
+  const createDraftLine = (productId: string) => visitId && state.ensureOrderDraft(visitId, productId)
+  const updateDraftQuantity = (productId: string, quantity: number) => visitId && state.setOrderLineQuantity(visitId, productId, quantity)
+  const updateDraftNote = (productId: string, note: string) => visitId && state.setOrderLineNote(visitId, productId, note)
+  const removeDraftLine = (productId: string) => visitId && state.removeOrderLine(visitId, productId)
 
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -50,28 +35,10 @@ export default function OrderPanel({ tableId }: OrderPanelProps) {
   const formId = useId()
 
   const items = draft?.items ?? []
-  const totalCents = useMemo(() => items.reduce((sum, line) => {
-    const product = catalog.find(p => p.id === line.productId)
-    if (!product || !product.available) return sum
-    return sum + product.unitPriceCents * line.quantity
-  }, 0), [items, catalog])
-
-  if (!detail.visit || !visitId) {
-    return null
-  }
-
-  const visit = detail.visit
-  const ordersForVisit = detail.orders.filter(order => order.visitId === visitId)
-  const canConfirm = hasDraft
-  const canOperate = (() => {
-    try {
-      // Check permission through requirePermission logic by calling can? but we want boolean
-      // easier: just try not needed; permissions checked on commands
-      return true
-    } catch {
-      return false
-    }
-  })()
+  const totalCents = items.reduce((sum, line) => sum + (state.products[line.productId]?.unitPriceCents ?? 0) * line.quantity, 0)
+  if (!visit || !visitId || !can(state, 'viewDetails', tableId)) return null
+  const ordersForVisit = Object.values(state.orders).filter(order => order.visitId === visitId)
+  const canConfirm = items.length > 0 && can(state, 'confirmOrder', tableId)
 
   const handleAddProduct = (productId: string) => {
     setError('')
@@ -88,7 +55,7 @@ export default function OrderPanel({ tableId }: OrderPanelProps) {
     const qty = Number(value)
     if (!Number.isFinite(qty)) return
     try {
-      updateDraftQuantity?.(productId, Math.trunc(qty))
+      updateDraftQuantity?.(productId, qty)
     } catch (cause) {
       setError(cause instanceof DomainError ? cause.message : 'Cantidad inválida.')
     }
@@ -118,10 +85,9 @@ export default function OrderPanel({ tableId }: OrderPanelProps) {
     setError('')
     setNotice('')
     const id = confirmId
-    setConfirmId(createCommandId)
     try {
-      ensureOrderDraftForVisit(visitId)
-      confirmOrder?.(id)
+      state.confirmOrder({ visitId, commandId: id })
+      setConfirmId(createCommandId())
       setNotice('Pedido confirmado.')
     } catch (cause) {
       setError(cause instanceof DomainError ? cause.message : 'No se pudo confirmar el pedido.')
@@ -131,10 +97,10 @@ export default function OrderPanel({ tableId }: OrderPanelProps) {
   const handleDeliver = (orderId: string) => {
     setError('')
     setNotice('')
-    const id = deliverIds[orderId] ?? createCommandId
-    setDeliverIds(prev => ({ ...prev, [orderId]: createCommandId }))
+    const id = deliverIds[orderId] ?? createCommandId()
+    setDeliverIds(prev => ({ ...prev, [orderId]: id }))
     try {
-      deliverOrder(orderId, id)
+      state.deliverOrder({ orderId, commandId: id })
       setNotice('Pedido marcado como entregado.')
     } catch (cause) {
       setError(cause instanceof DomainError ? cause.message : 'No se pudo marcar la entrega.')
@@ -218,10 +184,10 @@ export default function OrderPanel({ tableId }: OrderPanelProps) {
               Confirmar pedido
             </button>
           </div>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {notice && <p className="form-notice" role="status">{notice}</p>}
         </form>
       )}
+      <p className="form-error" role="alert">{error}</p>
+      <p className="form-notice" role="status">{notice}</p>
       <div className="orders-history">
         <h4>Pedidos</h4>
         {ordersForVisit.length === 0 && <p className="empty-state">Aún no hay pedidos confirmados.</p>}

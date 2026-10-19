@@ -17,8 +17,9 @@ export function validateOrderLine(product: Product, quantity: number, note: stri
 
 export function computeTotals(items: readonly OrderItem[]): { totalCents: number; currency: 'ARS' } {
   const totalCents = items.reduce((sum, item) => {
-    if (!Number.isFinite(item.unitPriceCents) || item.unitPriceCents < 0) return sum
-    if (!Number.isInteger(item.quantity) || item.quantity < 0) return sum
+    if (!Number.isSafeInteger(item.unitPriceCents) || item.unitPriceCents < 0 || !Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw new DomainError('INVALID_INPUT', 'El precio y la cantidad deben ser enteros válidos.')
+    }
     return sum + item.unitPriceCents * item.quantity
   }, 0)
   if (!Number.isFinite(totalCents) || totalCents < 0) {

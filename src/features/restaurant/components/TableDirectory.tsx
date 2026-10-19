@@ -9,8 +9,11 @@ import MoveTablePanel from './MoveTablePanel'
 import AssignmentPanel from './AssignmentPanel'
 import GuestCountForm from './GuestCountForm'
 import OrderPanel from './OrderPanel'
+import VisitTimer from './VisitTimer'
 
-export default function TableDirectory() {
+type Props = { mode?: 'list' | 'detail' | 'guests' | 'assignment' | 'orders' | 'move'; onSelected?: () => void }
+
+export default function TableDirectory({ mode = 'list', onSelected, now }: Props & { now: number }) {
   const state = useSessionStore(state => state)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -21,7 +24,8 @@ export default function TableDirectory() {
   const assignment = selected ? selectAssignment(state, selected.id) : undefined
   const visit = selected ? selectActiveVisit(state, selected.id) : undefined
   const detailsAllowed = selected ? can(state, 'viewDetails', selected.id) : false
-  const ownCount = Object.values(state.tables).filter(table => selectAssignment(state, table.id)?.waiterId === state.session.activeWaiterId).length
+  const floorTables = Object.values(state.tables).filter(table => table.floorId === state.transient.activeFloorId)
+  const ownCount = floorTables.filter(table => selectAssignment(state, table.id)?.waiterId === state.session.activeWaiterId).length
 
   function select(id: string | null, discard = false) {
     try {
@@ -29,6 +33,7 @@ export default function TableDirectory() {
       setPendingSelection(null)
       setConfirmDelete(null)
       setError('')
+      onSelected?.()
     } catch (cause) {
       if (cause instanceof DomainError && cause.code === 'UNRESOLVED_DRAFT') setPendingSelection({ id })
       else setError(cause instanceof Error ? cause.message : 'No se pudo seleccionar la mesa.')
@@ -39,34 +44,38 @@ export default function TableDirectory() {
     <section className="table-directory" aria-label="Mesas y detalle">
       <h3 ref={listHeading} tabIndex={-1} className="sr-heading">Mesas del salón</h3>
       {state.session.activeRole === 'waiter' && <p className="hud-copy">{ownCount ? `${ownCount} mesas a tu cargo.` : 'Todavía no tenés mesas asignadas.'} Podés consultar el estado general del salón.</p>}
-      <p className="hud-copy">Seleccioná una mesa en la lista o en la escena. La lista funciona sin vista 3D.</p>
+      {mode === 'list' && <><p className="hud-copy">Seleccioná una mesa en la lista o en la escena. La lista funciona sin vista 3D.</p>
       <ul className="table-list">
-        {Object.values(state.tables).map(table => {
-          const occupied = !!selectActiveVisit(state, table.id)
+        {floorTables.map(table => {
+          const activeVisit = selectActiveVisit(state, table.id)
+          const occupied = !!activeVisit
           const responsible = selectAssignment(state, table.id)
           return <li key={table.id}><button type="button" aria-pressed={selected?.id === table.id}
             onClick={() => select(table.id)} aria-controls="table-details">
             <span className={`table-dot${occupied ? ' is-busy' : ''}`} aria-hidden="true" />
             <strong>Mesa {table.number}</strong><span>{occupied ? 'Ocupada' : 'Libre'}</span>
+            {activeVisit && <small><VisitTimer visit={activeVisit} now={now} compact /></small>}
             <small>{responsible ? state.waiters[responsible.waiterId]?.name : 'Sin asignar'}{responsible?.waiterId === state.session.activeWaiterId ? ' · Tu mesa' : ''}</small>
           </button></li>
         })}
       </ul>
-      {!Object.keys(state.tables).length && <p className="hud-copy">No hay mesas. Administración puede construir el salón.</p>}
+      </>}
+      {!floorTables.length && <p className="hud-copy">No hay mesas en este piso.</p>}
       {pendingSelection && <div role="alert" className="draft-warning">
         <p>Hay un pedido sin confirmar.</p>
         <button type="button" onClick={() => setPendingSelection(null)}>Seguir editando</button>
         <button type="button" onClick={() => select(pendingSelection.id, true)}>Descartar y cambiar de mesa</button>
       </div>}
       <div id="table-details" className="table-details" aria-live="polite" tabIndex={-1}>
-        {selected ? <>
+        {selected && mode !== 'list' ? <>
           <h4 className="detail-title">Mesa {selected.number} <span className={`state-tag${visit ? ' is-busy' : ''}`}>{visit ? 'Ocupada' : 'Libre'}</span></h4>
           {detailsAllowed ? <div className="detail-stats">
+            <p>Piso: {state.floors[selected.floorId].name}.</p>
             <p><Info size={14} aria-hidden="true" /> Capacidad: {selected.capacity} personas.</p>
             <p>Responsable: {assignment ? state.waiters[assignment.waiterId]?.name : 'Sin asignar'}.</p>
             {visit && <p>{visit.guestCount}/{selected.capacity} clientes presentes.</p>}
           </div> : <p className="hud-copy">El detalle operativo está disponible únicamente para el mozo responsable.</p>}
-          {can(state, 'deleteTable', selected.id) && <div className="panel-actions">
+          {mode === 'detail' && can(state, 'deleteTable', selected.id) && <div className="panel-actions">
             <HudButton icon={Move} label="Mover mesa" disabled={!!visit || !!state.transient.movePreview} onClick={() => {
               try { state.beginMove(selected.id); setError('') }
               catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo iniciar el movimiento.') }
@@ -90,10 +99,10 @@ export default function TableDirectory() {
           <div className="panel-actions">
             <HudButton icon={PanelRightClose} label="Cerrar detalle" onClick={() => { select(null); listHeading.current?.focus() }} />
           </div>
-          <MoveTablePanel />
-          {detailsAllowed && <GuestCountForm key={selected.id} tableId={selected.id} />}
-          {can(state, 'assignTable', selected.id) && <AssignmentPanel key={selected.id} tableId={selected.id} />}
-          {detailsAllowed && visit && <OrderPanel tableId={selected.id} />}
+          {(mode === 'move' || mode === 'detail') && <MoveTablePanel />}
+          {mode === 'guests' && detailsAllowed && <GuestCountForm key={`${selected.id}-${visit?.id ?? 'free'}`} tableId={selected.id} now={now} />}
+          {mode === 'assignment' && can(state, 'assignTable', selected.id) && <AssignmentPanel key={selected.id} tableId={selected.id} />}
+          {mode === 'orders' && detailsAllowed && visit && <OrderPanel tableId={selected.id} />}
         </> : <p className="hud-copy">Seleccioná una mesa para consultar sus opciones.</p>}
       </div>
       <p role="alert" className="form-error">{error}</p>

@@ -1,113 +1,69 @@
-﻿# Restaurant Sim
+# Restaurant Sim
 
-Demo local con React, TypeScript, Vite y React Three Fiber. Incluye roles de Administración, Supervisión y Mi servicio sobre una sesión compartida, construcción del salón y eliminación de mesas.
+Demo local con React, TypeScript, Vite, React Three Fiber y Zustand. El salón ocupa toda la ventana; roles y controles flotan sobre la escena. Mesas, clientes, pedidos y mozos comparten una sesión en memoria.
 
 ## Ejecutar
 
 ```sh
+yarn install --frozen-lockfile
 yarn dev
 ```
 
-Abrir la URL que muestra Vite. Si faltan dependencias, usar `yarn install --frozen-lockfile` con Yarn 1. El entorno utilizado tiene Node 24 y Yarn 1.22.
+Usar Yarn 1 y Node 24 o posterior. Verificado con Node 26.11.1 y Yarn 1.22.22. Recargar reinicia la demo. No se agregaron dependencias para esta UI.
 
-## Construir el espacio
+## Interfaz del salón
 
-Elegí **Administración** en el selector **Modo demo** para acceder al formulario.
+- Arriba: Administración, Supervisión y Mi servicio. Este último permite elegir Ana, Bruno o Carla.
+- Abajo: directorios de Mesas y Mozos, e Indicadores de sesión; Administración también tiene Salón para construir/reiniciar.
+- Tocar una mesa muestra su selección y acciones en la barra inferior. Elegir Detalle, Clientes, Asignar mozo, Pedidos o Mover abre el formulario correspondiente en un panel deslizante.
+- La selección no abre automáticamente un panel que tape la escena. Cerrar un formulario conserva la selección y el borrador; la cruz de la barra deselecciona, con confirmación si hay un pedido pendiente.
+- Tocar el cubo o nombre de un mozo permite consultar sus mesas y última atención simulada. El directorio permite abrir una mesa para asignar o reasignar su responsable. Mi servicio muestra únicamente su propio avatar y clientes.
+- Mesas verdes: libres; ámbar: ocupadas. El resaltado celeste identifica la selección. Clientes: esferas; mozos: cubos de 0,28 m.
+- Las mesas ocupadas muestran cuánto tiempo llevan en atención desde el ingreso de clientes. El contador aparece también en la barra y el listado; se detiene al finalizar la visita.
+- El botón superior de pantalla completa usa la API del navegador cuando está disponible. El salón ocupa toda la ventana incluso sin esta API.
+- Los directorios y formularios HTML siguen funcionando sin WebGL.
 
-1. Ingresá la superficie en m² (entre 4 y 2500).
-2. Ingresá la cantidad de mesas (0 a 200, según la capacidad del terreno).
-3. Presioná **Construir espacio**.
+## Recorrido
 
-100 m² generan un suelo de 10 × 10 m. Cada mesa es un cubo de 1 m. Se distribuyen desde el centro, dejando 1 m entre cubos y al menos 0,5 m hasta el borde. Una construcción válida reemplaza el espacio y ajusta la cámara; los errores conservan la escena anterior.
+1. En Administración, seleccioná una mesa y usá **Asignar mozo** → Ana → **Guardar responsable**.
+2. Cambiá a **Mi servicio**, elegí Ana y seleccioná su mesa desde la escena o el directorio.
+3. En **Clientes**, ingresá de 1 a la capacidad o usá **Dictar cantidad**. El dictado propone un valor editable y requiere confirmación. Aparece una esfera por cliente.
+4. En **Pedidos**, agregá productos, cantidades y observaciones; confirmá el pedido y marcá la entrega.
+5. En **Supervisión**, seleccioná Ana y abrí **Mesas y acciones** para ver sus asignaciones y última atención simulada. La selección de una mesa propia representa atención; deseleccionarla la libera. El cambio a Supervisión conserva un snapshot.
+6. Entregá los pedidos y usá **Finalizar visita** desde Clientes. La mesa vuelve a libre, conserva el responsable y mantiene su historial. Indicadores permite revisar actividad global o por mozo.
 
-## Seleccionar y eliminar mesas
+Administración y Supervisión pueden asistir mesas asignadas y reasignar responsables. Cambiar el responsable de una mesa ocupada requiere confirmación; los pedidos previos conservan su atribución. Un borrador bloquea cambios de mesa/rol hasta descartarlo expresamente.
 
-- Hacé clic en un cubo para resaltarlo y abrir un menú sobre la mesa.
-- **Mover mesa** inicia una vista previa para Administración y Supervisión, solo en mesas libres.
-- **Eliminar mesa** abre la confirmación. **Cancelar** vuelve al menú sin borrar.
-- **Confirmar** elimina la mesa con una nube de humo. El contador se actualiza; las demás mesas conservan posición, identificación y color.
-- **Escape** vuelve de la confirmación al menú o cierra el menú. También podés cerrarlo con la cruz o haciendo clic en el suelo.
-- La animación se acorta si el sistema solicita movimiento reducido.
+## Distribución y cámara
 
-La lista HTML debajo de la escena comparte la selección y permite consultar detalles, cancelar y confirmar eliminaciones sin WebGL. Usá Tab y Enter/Espacio para seleccionar sus botones. Administración y Supervisión pueden eliminar mesas libres; Mi servicio no permite editar la distribución. El humo se reproduce al eliminar desde la escena.
+**Salón** permite construir entre 4 y 2500 m², con 0–200 mesas según capacidad. Reconstruir requiere confirmación porque elimina las operaciones de la sesión.
 
-## Roles de demo
+En una mesa libre, **Mover** abre vista previa: arrastrá el cubo o editá X/Z en pasos de 0,5 m. Guardar confirma una posición válida; Cancelar, Escape o cerrar el panel descartan la vista previa. La cámara se pausa durante el movimiento. **Detalle** incluye eliminación confirmada, con humo y respeto por movimiento reducido.
 
-- **Administración:** formulario de construcción, consulta del salón y eliminación de mesas libres.
-- **Supervisión:** consulta del salón y eliminación de mesas libres; no puede reconstruirlo.
-- **Mi servicio:** selector de Ana, Bruno o Carla; ve el estado general y solo accede a detalles operativos de sus mesas asignadas.
+Arrastrar desplaza la cámara; rueda o +/− ajustan zoom; **Centrar salón** restablece el encuadre. Con foco en la escena, flechas desplazan, +/− hacen zoom y 0 centra. Un dedo desplaza y dos permiten zoom. Seleccionar o cambiar de rol conserva el encuadre; reconstruir lo restablece.
 
-Cambiar de rol o mozo conserva la sesión y limpia selección/edición temporal. Un borrador pendiente bloquea el cambio hasta descartarlo expresamente o seguir editando. Administración y Supervisión ya pueden asignar mesas desde su detalle. Mi servicio comienza sin mesas propias hasta que se asignen. Los pedidos llegan en P07. La matriz de permisos es compartida por UI y acciones implementadas, y representa reglas locales de demo.
-
-## Controles de cámara
-
-- Arrastrar con botón izquierdo o derecho: desplazarse sobre el suelo. Un arrastre no debe abrir el menú de mesa.
-- Rueda o botones **+ / −**: acercar y alejar.
-- **Restablecer vista** o centrar: recuperar el encuadre inicial.
-- Con foco en la escena: flechas para desplazarse, **+ / −** para zoom y **0** para restablecer.
-- Pantalla táctil: un dedo desplaza; dos dedos permiten desplazar y hacer zoom.
-
-Eliminar una mesa conserva el encuadre. Reconstruir restablece cámara, selección y efectos.
-
-## Validación
+## Validación del 14/10/2026
 
 ```sh
 yarn test
 yarn lint
 yarn build
-yarn preview
 ```
 
-Las pruebas usan el runner integrado de Node, sin dependencias adicionales. `yarn test` ejecuta `node --experimental-transform-types --test` sobre los seis archivos de prueba (espacio, sesión, permisos, movimiento, asignaciones y visitas). El flag habilita la ejecución directa de TypeScript en Node 22.7+ y sigue siendo válido en Node 24, donde el stripping ya viene activo por defecto. Cubren distribución, eliminación, referencias, números estables, errores sin mutaciones, eventos atómicos, reloj no decreciente, limpieza al reiniciar, aislamiento entre sesiones, permisos, navegación con borradores, movimiento, asignaciones y visitas. Los tests TypeScript se comprueban con la configuración Node; el código de aplicación, con la del navegador. Ambas usan `strict` explícito.
+51 pruebas de dominio, estado y dictado aprobadas; lint y build correctos. Vite mantiene el aviso de bundle mayor a 500 kB. `yarn test` usa `node --test` e incluye geometría y los archivos colocados bajo domain, state y speech. Node moderno ejecuta estos archivos TypeScript directamente, sin el flag experimental retirado en Node 26.
 
-Validación del 13/10/2026: 27 pruebas aprobadas, `yarn lint` y `yarn build` correctos (aviso conocido de Vite por bundle mayor a 500 kB). Los roles, teclado, fallback sin WebGL, confirmación, gestos, humo y cámara siguen pendientes de validación visual: no hubo navegador disponible en la sesión. No hay pruebas DOM/WebGL automatizadas. El entorno de esta máquina usa Node 22.16; con Node 22.6–22.16 el flag es necesario y con Node 24 es redundante pero inocuo.
+Recorrido local mediante Chrome Headless 154.0.8037.99 y CDP: clic sobre mesa 3D, barra contextual, asignación, cambio de rol, cuatro clientes, confirmación/entrega de pedido, consulta del mozo y snapshot, movimiento por coordenadas (válido e inválido), cancelación/Escape/cierre, eliminación, pan por teclado, zoom/reset y formularios sin WebGL. Revisados tamaños 1280×720, 768×1024 y 390×844. Sin excepciones no capturadas en los recorridos finales.
 
-## Alcance y estructura
+Capturas: [salón](docs/ui/salon-desktop.png), [mesa](docs/ui/mesa-desktop.png), [contador activo](docs/ui/contador-mesa.png), [varios pisos](docs/ui/varios-pisos.png), [administración de pisos](docs/ui/administrar-pisos.png), [mozo](docs/ui/mozo-desktop.png), [móvil](docs/ui/mesa-mobile.png), [clientes móvil](docs/ui/clientes-mobile.png), [sin WebGL](docs/ui/sin-webgl.png).
 
-No hay backend, autenticación ni persistencia. Al recargar se vuelve a 100 m² y 6 mesas. El input de cantidad configura la próxima construcción; el contador muestra las mesas presentes después de las eliminaciones.
+Pendiente: arrastre completo y pérdida de captura en dispositivo táctil real, API fullscreen real, revisión exhaustiva con lector de pantalla, 30 s de rendimiento con 200 mesas/1600 clientes. Las verificaciones de navegador de esta entrega se ejecutaron como scripts temporales CDP; no se incorporó un runner DOM.
 
-- `src/App.tsx`: formulario, proyección del estado compartido y controles HTML.
-- `src/features/restaurant/domain`: tipos de entidades, errores y contratos de operaciones futuras.
-- `src/features/restaurant/data`: tres mozos y catálogo determinista con precios enteros en centavos ARS.
-- `src/features/restaurant/state`: store de sesión Zustand, selectores por ID y pruebas con Node.
-- `src/features/supervisor/domain/space.ts`: capacidad, distribución y eliminación.
-- `src/features/supervisor/scene/RestaurantScene.tsx`: suelo, mesas, selección y cámara.
-- `src/features/supervisor/scene/TableMenu.tsx`: opciones y confirmación.
-- `src/features/supervisor/scene/SmokeEffect.tsx`: animación de desaparición.
-- [SPEC.md](SPEC.md): alcance y arquitectura.
-- [TASKS.md](TASKS.md): issues P01–P11 de la demo operativa y P12 de evolución futura; incluye subtareas, dependencias y criterios de aceptación.
-- [Presentación de roles](docs/planning/slides/restaurant-sim-roles.pptx): planificación de administrador, supervisor y mozos.
+## Arquitectura y alcance
 
-## Próxima etapa planificada
+El dominio y las acciones permanecen en `src/features/restaurant/domain` y `state`; la UI no mantiene copias de entidades. La selección de mesa está en Zustand, y la selección de mozo y panel abierto son transitorios de la interfaz. `SceneLabels` proyecta etiquetas en una capa HTML del mismo árbol React: evita crear una raíz React por mesa y actualiza posiciones solo al renderizar la escena bajo demanda. DPR [1, 1.5].
 
-P01 tiene implementada la base del dominio y sesión. Zustand ya estaba instalado y ahora centraliza las entidades, construcción, eliminación y selección. `tables` y `placements` son la fuente de verdad; `SpaceLayout` se deriva para reutilizar la escena B01/B02 sin mantener otra colección. Solo el humo conserva coordenadas temporales para su animación. La fábrica de store acepta reloj y generador de IDs para pruebas; el hook comparte una única instancia en memoria. Reconstruir cambia la sesión y recargar crea una nueva.
+Los paneles se montan cuando se abren; los borradores de pedidos permanecen en el store. Cambiar rol o sesión limpia los paneles y la selección de mozo sin recrear el canvas por rol. Las operaciones gráficas no escriben posiciones del dominio por frame.
 
-Las operaciones futuras tienen contratos tipados, pero no acciones vacías ejecutables. Las reglas completas y confirmaciones operativas se implementarán en sus issues. P02 agrega navegación, permisos y lista HTML accesible; P03 agrega movimiento con vista previa, P04 asignaciones y P05 clientes/visitas. La próxima implementación según el backlog es P07: pedidos, seguida de P06: dictado. La comprobación visual de P01–P05 permanece pendiente.
+Siguen pendientes el micrófono físico, la validación integral y medición de rendimiento (P11). Varios pisos ya permite crear, renombrar, ordenar y eliminar niveles, cambiar la vista y filtrar métricas; el recorrido integral de P13 en móvil y fallback sigue pendiente. No hay caminatas simuladas, backend, autenticación, persistencia, pagos ni seguimiento real de personas.
 
-El spec del 13 de octubre de 2026 incorpora además dictado, pedidos, avatares simples y métricas de sesión. Los clientes serán esferas y los mozos cubos pequeños. Estas funcionalidades posteriores a P05 todavía no están implementadas.
-
-## Ingresar clientes (P05)
-
-Asigná una mesa a un mozo. Como ese mozo, o desde Administración/Supervisión, seleccioná la mesa e ingresá una cantidad entera entre 1 y su capacidad. **Confirmar ingreso** crea la visita y marca la mesa como ocupada. El menú de la escena incluye **Ingresar clientes**, que lleva al formulario HTML.
-
-En una mesa ocupada, **Guardar cantidad** permite corregir comensales sin cambiar la hora de ingreso. El contador muestra cantidad/capacidad. Administración y Supervisión pueden cambiar la capacidad de 1 a 8 solo mientras la mesa esté libre. Una mesa ocupada no se puede mover ni eliminar. El cierre de visita llegará en P09; todavía no hay avatares ni dictado.
-
-Validación P05: 27 pruebas aprobadas con `yarn test` (incluye `domain/visits.test.ts`), lint sin advertencias y build correcto. Recorrido visual y teclado pendientes por falta de navegador conectado a la herramienta.
-
-## Asignar mesas (P04)
-
-Como Administración o Supervisión, seleccioná una mesa y elegí Ana, Bruno o Carla en **Responsable de la mesa**, debajo de la escena. **Guardar responsable** confirma el cambio; **Sin asignar** retira el responsable de una mesa libre. Un mozo puede tener varias mesas. La lista y Mi servicio reflejan la nueva asignación inmediatamente.
-
-El dominio conserva los intervalos históricos. Reasignar una mesa ocupada exige reemplazo y confirmación, además del descarte explícito de cualquier borrador. Los pedidos anteriores conservan su responsable histórico. Estos casos se probaron con fixtures hasta que P05/P07 permitan el recorrido desde la UI.
-
-Validación P04: 23 pruebas aprobadas con `yarn test` (incluye `domain/assignments.test.ts`), lint sin advertencias y build correcto. Formulario y teclado pendientes de revisión visual por falta de navegador conectado a la herramienta.
-
-El plan anterior se conserva en `docs/planning/archive/` como referencia histórica.
-
-## Mover mesas (P03)
-
-Elegí una mesa libre y pulsá **Mover mesa**. Arrastrá el cubo de vista previa o editá X/Z en el detalle debajo de la escena, en pasos de 0,5 m. Verde indica posición válida; rojo, inválida. Soltar no guarda: usá **Guardar posición** para confirmar. Se exige margen de 0,5 m al borde y separación de 1 m entre cubos en al menos un eje.
-
-Cancelar, Escape, cambiar de rol/mesa o perder la captura durante el gesto descartan la edición. La cámara queda pausada durante el modo mover y recupera sus controles al terminar. La alternativa por coordenadas funciona sin WebGL.
-
-Validación P03: 19 pruebas aprobadas (`yarn test`, ahora incluye `domain/movement.test.ts`), lint sin advertencias y build correcto. Localhost:5173 respondió HTTP 200. Falta validación visual de arrastre, captura, teclado, cámara y resize porque la herramienta no detectó un navegador disponible. La próxima implementación es P04: asignaciones.
+[SPEC.md](SPEC.md) y [TASKS.md](TASKS.md) conservan el plan y registran esta entrega. La planificación anterior y la presentación de roles están en `docs/planning/`.

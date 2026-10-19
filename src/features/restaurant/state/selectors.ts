@@ -13,10 +13,11 @@ export const selectAssignment = (state: SessionData, tableId: string) =>
   Object.values(state.assignments).find(assignment => assignment.tableId === tableId && assignment.endedAt === null)
 
 // Compatibility projection for B01/B02, never stored as a second collection.
-export function selectLayout(state: Pick<SessionData, 'space' | 'tables' | 'placements'>): SpaceLayout {
+export function selectLayout(state: Pick<SessionData, 'space' | 'floors' | 'tables' | 'placements'>, floorId = 'floor-1'): SpaceLayout {
   return {
-    ...state.space,
-    tables: Object.values(state.tables).map(table => {
+    area: state.floors[floorId].area,
+    side: state.floors[floorId].side,
+    tables: Object.values(state.tables).filter(table => table.floorId === floorId).map(table => {
       const placement = state.placements[table.id]
       return { id: table.id, x: placement.x, z: placement.z }
     }),

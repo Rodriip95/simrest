@@ -5,11 +5,14 @@ import { OrbitControls } from '@react-three/drei'
 import { MOUSE, TOUCH, Vector3 } from 'three'
 import { TABLE_SIZE } from '../domain/space'
 import type { SpaceLayout } from '../domain/space'
-import TableMenu from './TableMenu'
-import SmokeEffect from './SmokeEffect'
-import { useSessionStore } from '../../restaurant/state/useSessionStore'
+import { sessionStore, useSessionStore } from '../../restaurant/state/useSessionStore'
 import { DomainError } from '../../restaurant/domain/commands'
 import MovePreview from './MovePreview'
+import SmokeEffect from './SmokeEffect'
+import SceneLabels, { LabelProjection } from './SceneLabels'
+import type { LabelElements, SceneLabel } from './SceneLabels'
+import { formatVisitDuration, visitDurationMs } from '../../restaurant/domain/visitDuration'
+import { selectActiveVisit, selectAssignment } from '../../restaurant/state/selectors'
 
 export type SceneActions = {
   zoom: (direction: number) => void
@@ -19,25 +22,36 @@ export type SceneActions = {
 
 type SceneProps = {
   layout: SpaceLayout
-  onDeleteTable: (id: string) => void
+  floorId: string
+  now: number
+  selectedWaiterId: string | null
+  onSelectWaiter: (id: string) => void
+  onSelectTable: () => void
 }
 
-function SceneContents({ actionsRef, layout, onDeleteTable }: SceneProps & { actionsRef: Ref<SceneActions> }) {
+function SceneContents({ actionsRef, layout, floorId, selectedWaiterId, onSelectWaiter, onSelectTable, labels, elements }: SceneProps & { actionsRef: Ref<SceneActions>; labels: SceneLabel[]; elements: LabelElements }) {
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null)
   const { size, camera, gl } = useThree()
   const selectedId = useSessionStore(state => state.transient.selectedTableId)
   const setSelectedId = useSessionStore(state => state.selectTable)
   const movingId = useSessionStore(state => state.transient.movePreview?.tableId)
+  const state = useSessionStore(state => state)
   const [smoke, setSmoke] = useState<SpaceLayout['tables']>([])
-  const selectedTable = layout.tables.find(table => table.id === selectedId)
+  useEffect(() => sessionStore.subscribe((next, previous) => {
+    if (next.session.id !== previous.session.id) { setSmoke([]); return }
+    const removed = Object.values(previous.placements).filter(item => !next.tables[item.tableId])
+    if (removed.length) setSmoke(current => [...current, ...removed.map(item => ({ id: item.tableId, x: item.x, z: item.z }))])
+  }), [])
   const selectTable = (id: string | null) => {
     try {
       setSelectedId(id)
+      onSelectTable()
       return true
     } catch (cause) {
       if (cause instanceof DomainError && cause.code === 'UNRESOLVED_DRAFT') {
         if (window.confirm('Hay un pedido sin confirmar. ¿Descartar el borrador y cambiar de mesa?')) {
           setSelectedId(id, true)
+          onSelectTable()
           return true
         }
         return false
@@ -62,7 +76,7 @@ function SceneContents({ actionsRef, layout, onDeleteTable }: SceneProps & { act
     camera.lookAt(0, 0, 0)
     controls.current?.target.set(0, 0, 0)
     controls.current?.update()
-  }, [camera, initialPosition])
+  }, [camera, initialPosition, state.session.id, floorId])
 
   useImperativeHandle(actionsRef, () => ({
     zoom(direction) {
@@ -94,12 +108,12 @@ function SceneContents({ actionsRef, layout, onDeleteTable }: SceneProps & { act
 
   return (
     <>
-      <color attach="background" args={['#eeefeb']} />
+      <color attach="background" args={['#090f19']} />
       <ambientLight intensity={1.4} />
       <directionalLight position={[5, 12, 8]} intensity={2.2} />
       <mesh position={[0, -0.24, 0]}>
         <boxGeometry args={[side, 0.45, side]} />
-        <meshStandardMaterial color="#d1ccbf" roughness={0.95} />
+        <meshStandardMaterial color="#142535" roughness={0.95} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.008, 0]} onClick={event => {
         if (movingId || event.delta > 5 || event.button !== 0) return
@@ -107,40 +121,57 @@ function SceneContents({ actionsRef, layout, onDeleteTable }: SceneProps & { act
         closeMenu()
       }}>
         <planeGeometry args={[side, side]} />
-        <meshStandardMaterial color="#faf7ee" roughness={1} />
+        <meshStandardMaterial color="#142330" roughness={1} />
       </mesh>
       {lines.map((coordinate, i) => (
         <mesh key={`x-${i}`} position={[coordinate, 0, 0]}>
-          <boxGeometry args={[0.012, 0.005, side]} /><meshBasicMaterial color="#deddd3" />
+          <boxGeometry args={[0.012, 0.005, side]} /><meshBasicMaterial color="#263d4e" />
         </mesh>
       ))}
       {lines.map((coordinate, i) => (
         <mesh key={`z-${i}`} position={[0, 0, coordinate]}>
-          <boxGeometry args={[side, 0.005, 0.012]} /><meshBasicMaterial color="#deddd3" />
+          <boxGeometry args={[side, 0.005, 0.012]} /><meshBasicMaterial color="#263d4e" />
         </mesh>
       ))}
-      {layout.tables.map(table => (
-        <mesh key={table.id} position={[table.x, TABLE_SIZE / 2, table.z]} onClick={event => {
-          event.stopPropagation()
-          if (!movingId && event.delta <= 5 && event.button === 0) selectTable(table.id)
-        }}>
-          <boxGeometry args={[TABLE_SIZE, TABLE_SIZE, TABLE_SIZE]} />
-          <meshStandardMaterial color={['#8bb6a1', '#b1a6c8', '#d8b68a'][(Number(table.id.replace('table-', '')) - 1) % 3]}
-            emissive={table.id === selectedId ? '#426746' : '#000000'} emissiveIntensity={0.4} roughness={0.8} />
-        </mesh>
-      ))}
+      {layout.tables.map(table => {
+        const visit = selectActiveVisit(state, table.id)
+        const showGuests = state.session.activeRole !== 'waiter' || selectAssignment(state, table.id)?.waiterId === state.session.activeWaiterId
+        return <group key={table.id}>
+          <mesh position={[table.x, TABLE_SIZE / 2, table.z]} onClick={event => {
+            event.stopPropagation()
+            if (!movingId && event.delta <= 5 && event.button === 0) selectTable(table.id)
+          }}>
+            <boxGeometry args={[TABLE_SIZE, TABLE_SIZE, TABLE_SIZE]} />
+            <meshStandardMaterial color={visit ? '#c79a65' : '#477e7b'}
+              emissive={table.id === selectedId ? '#39ecff' : '#000000'} emissiveIntensity={0.3} roughness={0.65} />
+          </mesh>
+          {showGuests && visit?.customerIds.map((id, index) => {
+            const angle = index * Math.PI / 4
+            return <mesh key={id} position={[table.x + Math.cos(angle) * 0.78, 0.16, table.z + Math.sin(angle) * 0.78]} raycast={() => null}>
+              <sphereGeometry args={[0.12, 12, 8]} /><meshStandardMaterial color="#e6d4b4" />
+            </mesh>
+          })}
+        </group>
+      })}
+      {Object.values(state.waiters).filter(waiter => waiter.active && (state.session.activeRole !== 'waiter' || waiter.id === state.session.activeWaiterId)).map((waiter, index) => {
+        const presence = state.presences[waiter.id]
+        const placement = presence?.attendingTableId && state.tables[presence.attendingTableId]?.floorId === floorId ? state.placements[presence.attendingTableId] : undefined
+        const x = placement ? placement.x + 0.78 : -side / 2 + 0.3 + index * (side - 0.6) / 3
+        const z = placement ? placement.z + 0.78 : side / 2 - 0.3
+        return <group key={waiter.id} position={[x, 0.18, z]}>
+          <mesh onClick={event => {
+            event.stopPropagation()
+            if (!movingId && event.delta <= 5 && event.button === 0) onSelectWaiter(waiter.id)
+          }}>
+            <boxGeometry args={[0.28, 0.28, 0.28]} />
+            <meshStandardMaterial color={waiter.color} emissive={waiter.id === selectedWaiterId ? '#39ecff' : '#000000'} emissiveIntensity={0.5} />
+          </mesh>
+        </group>
+      })}
       {movingId && <MovePreview key={movingId} />}
-      {selectedTable && !movingId ? (
-        <TableMenu key={selectedTable.id} table={selectedTable} onClose={closeMenu} onDelete={() => {
-          onDeleteTable(selectedTable.id)
-          setSmoke(current => [...current, selectedTable])
-          closeMenu()
-        }} />
-      ) : null}
-      {smoke.map(table => (
-        <SmokeEffect key={table.id} x={table.x} z={table.z}
-          onComplete={() => setSmoke(current => current.filter(effect => effect.id !== table.id))} />
-      ))}
+      {smoke.map(table => <SmokeEffect key={table.id} x={table.x} z={table.z}
+        onComplete={() => setSmoke(current => current.filter(item => item.id !== table.id))} />)}
+      <LabelProjection labels={labels} elements={elements} />
       <OrbitControls ref={controls} makeDefault enabled={!movingId} enableRotate={false} enableDamping={false}
         screenSpacePanning={false} minDistance={2} maxDistance={maxDistance} zoomSpeed={0.8}
         mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }}
@@ -156,11 +187,29 @@ function SceneContents({ actionsRef, layout, onDeleteTable }: SceneProps & { act
   )
 }
 
-export default function RestaurantScene({ ref, layout, onDeleteTable }: SceneProps & { ref: Ref<SceneActions> }) {
-  return (
+export default function RestaurantScene({ ref, ...props }: SceneProps & { ref: Ref<SceneActions> }) {
+  const state = useSessionStore(state => state)
+  const elements = useRef(new Map<string, HTMLElement>())
+  const side = props.layout.side
+  const labels: SceneLabel[] = props.layout.tables.map(table => {
+    const visit = selectActiveVisit(state, table.id)
+    return { id: table.id, position: [table.x, 1.12, table.z], kind: 'table',
+      selected: table.id === state.transient.selectedTableId,
+      text: `${state.tables[table.id].number}${visit ? ` · ${formatVisitDuration(visitDurationMs(visit, props.now))}` : ''}` }
+  })
+  Object.values(state.waiters).filter(waiter => waiter.active && (state.session.activeRole !== 'waiter' || waiter.id === state.session.activeWaiterId)).forEach((waiter, index) => {
+    const presence = state.presences[waiter.id]
+    const placement = presence?.attendingTableId && state.tables[presence.attendingTableId]?.floorId === props.floorId ? state.placements[presence.attendingTableId] : undefined
+    const x = placement ? placement.x + 0.78 : -side / 2 + 0.3 + index * (side - 0.6) / 3
+    const z = placement ? placement.z + 0.78 : side / 2 - 0.3
+    labels.push({ id: waiter.id, position: [x, 0.6, z], kind: 'waiter', text: waiter.name,
+      selected: waiter.id === props.selectedWaiterId, onSelect: () => props.onSelectWaiter(waiter.id) })
+  })
+  return <>
     <Canvas frameloop="demand" dpr={[1, 1.5]} camera={{ position: [13, 15, 16], fov: 42 }}
-      fallback={<div className="canvas-fallback">Tu navegador no pudo iniciar la vista 3D. Probá activar la aceleración gráfica.</div>}>
-      <SceneContents actionsRef={ref} layout={layout} onDeleteTable={onDeleteTable} />
+      fallback={<div className="canvas-fallback">Tu navegador no pudo iniciar la vista 3D. Usá la lista de mesas para continuar.</div>}>
+      <SceneContents actionsRef={ref} {...props} labels={labels} elements={elements} />
     </Canvas>
-  )
+    <SceneLabels labels={labels} elements={elements} moving={!!state.transient.movePreview} />
+  </>
 }

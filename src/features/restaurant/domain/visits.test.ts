@@ -98,3 +98,57 @@ test('corrections preserve visit time, existing customer IDs, orders and drafts'
   after.switchRole('waiter', 'bruno')
   assert.throws(() => store.getState().updateGuestCount({ visitId: visit.id, guestCount: 2, commandId: 'foreign' }), DomainError)
 })
+
+test('closing a visit preserves history and assignment, releases presence and allows a new visit', () => {
+  let time = 1000
+  let id = 0
+  const store = createSessionStore({ now: () => ++time, createId: () => `close-${++id}` })
+  store.getState().assignTable({ tableId: 'table-1', waiterId: 'ana', commandId: 'assign-close', confirmOccupied: false, discardDraft: false })
+  store.getState().switchRole('waiter', 'ana')
+  store.getState().openVisit({ tableId: 'table-1', guestCount: 2, commandId: 'open-close' })
+  store.getState().selectTable('table-1')
+  const visit = selectActiveVisit(store.getState(), 'table-1')!
+  store.getState().closeVisit({ visitId: visit.id, commandId: 'close-visit', discardDraft: false })
+  const closed = store.getState()
+  assert.equal(closed.visits[visit.id].closedAt, time)
+  assert.equal(closed.visits[visit.id].customerIds.length, 2)
+  assert.equal(selectActiveVisit(closed, 'table-1'), undefined)
+  assert.equal(closed.presences.ana.attendingTableId, null)
+  assert.ok(Object.values(closed.assignments).some(item => item.tableId === 'table-1' && item.waiterId === 'ana' && item.endedAt === null))
+  assert.equal(closed.events.at(-1)?.type, 'visit.closed')
+  closed.closeVisit({ visitId: visit.id, commandId: 'close-visit', discardDraft: false })
+  assert.equal(store.getState(), closed)
+  store.getState().openVisit({ tableId: 'table-1', guestCount: 1, commandId: 'second-visit' })
+  assert.notEqual(selectActiveVisit(store.getState(), 'table-1')?.id, visit.id)
+})
+
+test('closing rejects pending deliveries and requires explicit draft discard', () => {
+  const store = fixture()
+  store.getState().openVisit({ ...open, guestCount: 2 })
+  const visit = selectActiveVisit(store.getState(), 'table-1')!
+  store.getState().ensureOrderDraft(visit.id, 'coffee')
+  const withDraft = store.getState()
+  assert.throws(() => withDraft.closeVisit({ visitId: visit.id, commandId: 'close-draft', discardDraft: false }), (error: unknown) => error instanceof DomainError && error.code === 'UNRESOLVED_DRAFT')
+  assert.equal(store.getState(), withDraft)
+  store.getState().confirmOrder({ visitId: visit.id, commandId: 'confirm-close' })
+  const pending = store.getState()
+  assert.throws(() => pending.closeVisit({ visitId: visit.id, commandId: 'close-pending', discardDraft: true }), (error: unknown) => error instanceof DomainError && error.code === 'PENDING_ORDERS')
+  assert.equal(store.getState(), pending)
+  const order = Object.values(pending.orders)[0]
+  pending.deliverOrder({ orderId: order.id, commandId: 'deliver-close' })
+  store.getState().ensureOrderDraft(visit.id, 'sandwich')
+  store.getState().closeVisit({ visitId: visit.id, commandId: 'close-final', discardDraft: true })
+  assert.equal(store.getState().transient.orderDrafts[visit.id], undefined)
+  assert.equal(store.getState().orders[order.id].status, 'delivered')
+})
+
+test('closing validates role, visit identity and command id without mutation', () => {
+  const store = fixture()
+  store.getState().openVisit(open)
+  const visit = selectActiveVisit(store.getState(), 'table-1')!
+  store.getState().switchRole('waiter', 'bruno')
+  const before = store.getState()
+  assert.throws(() => before.closeVisit({ visitId: visit.id, commandId: 'foreign-close', discardDraft: false }), DomainError)
+  assert.throws(() => before.closeVisit({ visitId: 'missing', commandId: 'missing-close', discardDraft: false }), DomainError)
+  assert.equal(store.getState(), before)
+})
