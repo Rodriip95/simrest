@@ -1,0 +1,124 @@
+[
+  {
+    "id": "table-square",
+    "model": "table-square.glb",
+    "sizeXYZ": [
+      1.0,
+      0.7304,
+      1.0
+    ],
+    "units": "metres"
+  },
+  {
+    "id": "table-round",
+    "model": "table-round.glb",
+    "sizeXYZ": [
+      1.0,
+      0.7304,
+      1.0
+    ],
+    "units": "metres"
+  },
+  {
+    "id": "chair-sage",
+    "model": "chair-sage.glb",
+    "sizeXYZ": [
+      0.44,
+      0.8608,
+      0.4686
+    ],
+    "units": "metres"
+  },
+  {
+    "id": "chair-terracotta",
+    "model": "chair-terracotta.glb",
+    "sizeXYZ": [
+      0.44,
+      0.8608,
+      0.4686
+    ],
+    "units": "metres"
+  },
+  {
+    "id": "chair-cream",
+    "model": "chair-cream.glb",
+    "sizeXYZ": [
+      0.44,
+      0.8608,
+      0.4686
+    ],
+    "units": "metres"
+  },
+  {
+    "id": "dining-square-four",
+    "model": "dining-square-four.glb",
+    "sizeXYZ": [
+      1.9372,
+      0.8608,
+      1.9372
+    ],
+    "units": "metres",
+    "seats": [
+      {
+        "position": [
+          0.0,
+          0.489,
+          -0.72
+        ],
+        "rotationY": -0.0
+      },
+      {
+        "position": [
+          0.72,
+          0.489,
+          -0.0
+        ],
+        "rotationY": -1.5708
+      },
+      {
+        "position": [
+          0.0,
+          0.489,
+          0.72
+        ],
+        "rotationY": -3.1416
+      },
+      {
+        "position": [
+          -0.72,
+          0.489,
+          0.0
+        ],
+        "rotationY": -4.7124
+      }
+    ]
+  },
+  {
+    "id": "dining-round-two",
+    "model": "dining-round-two.glb",
+    "sizeXYZ": [
+      1.0,
+      0.8608,
+      1.9372
+    ],
+    "units": "metres",
+    "seats": [
+      {
+        "position": [
+          0.0,
+          0.489,
+          -0.72
+        ],
+        "rotationY": -0.0
+      },
+      {
+        "position": [
+          0.0,
+          0.489,
+          0.72
+        ],
+        "rotationY": -3.1416
+      }
+    ]
+  }
+]

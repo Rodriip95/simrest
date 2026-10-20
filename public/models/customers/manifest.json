@@ -1,0 +1,62 @@
+[
+  {
+    "id": "man-polo",
+    "label": "Hombre / polo verde / jopo",
+    "model": "man-polo.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  },
+  {
+    "id": "man-denim",
+    "label": "Hombre / chaqueta denim / rizos",
+    "model": "man-denim.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  },
+  {
+    "id": "man-ochre",
+    "label": "Hombre / camisa mostaza / raya lateral",
+    "model": "man-ochre.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  },
+  {
+    "id": "woman-coral",
+    "label": "Mujer / blusa coral / bob",
+    "model": "woman-coral.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  },
+  {
+    "id": "woman-lilac",
+    "label": "Mujer / top lila / rizos",
+    "model": "woman-lilac.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  },
+  {
+    "id": "woman-sage",
+    "label": "Mujer / cardigan salvia / coleta",
+    "model": "woman-sage.glb",
+    "animations": [
+      "Idle",
+      "Walk",
+      "Sit"
+    ]
+  }
+]

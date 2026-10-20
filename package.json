@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/space.test.mjs src/features/restaurant/state/*.test.ts src/features/restaurant/domain/*.test.ts src/features/restaurant/speech/*.test.ts",
+    "test": "node --test tests/space.test.mjs tests/dining-layout.test.ts src/features/restaurant/state/*.test.ts src/features/restaurant/domain/*.test.ts src/features/restaurant/speech/*.test.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

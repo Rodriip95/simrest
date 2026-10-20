@@ -1,0 +1,76 @@
+/* Reference: resim, Wireframe 1/2 and ModalMesa. Live scene remains interactive. */
+:root {
+  --bg: #292937;
+  --panel: #0a1927f5;
+  --panel-solid: #0a1927;
+  --fill: #0c1b28;
+  --line: #7189a499;
+  --line-strong: #7189a4;
+  --cyan: #85b7e6;
+  --lime: #1baa82;
+  --warn: #d7bb1f;
+  --text: #ffffff;
+  --muted: #a2b2c3;
+  --font: Poppins, Inter, 'Segoe UI', sans-serif;
+  --mono: var(--font);
+}
+.simrest-shell { --sidebar-width: 228px; background: #fff; padding: 15px; }
+.salon-sidebar { position: absolute; inset: 15px auto 15px 14px; width: var(--sidebar-width); padding: 24px 20px; border-radius: 24px; background: #292937; z-index: 20; display: flex; flex-direction: column; gap: 28px; }
+.simrest-brand { font-family: Inter, 'Segoe UI', sans-serif; font-size: 32px; font-weight: 400; letter-spacing: -.5px; }
+.salon-sidebar nav { display: grid; gap: 5px; }
+.salon-sidebar .hud-btn { width: 100%; justify-content: flex-start; color: #fff; font-size: 14px; font-weight: 400; }
+.salon-sidebar .hud-btn.is-active { background: #414150; border-color: transparent; }
+.salon-sidebar .hud-btn:disabled { opacity: .42; }
+.sidebar-foot { margin-top: auto; }.sidebar-foot p { font-size: 10px; color: #b3b3c3; margin-top: 16px; }
+.simrest-shell > .scene-viewport, .figma-reference { inset: 15px 15px 15px calc(var(--sidebar-width) + 31px); border-radius: 24px; overflow: hidden; background: #292937; }
+.simrest-shell > .hud { left: calc(var(--sidebar-width) + 31px); right: 15px; top: 15px; bottom: 15px; border-radius: 24px; overflow: hidden; }
+.simrest-shell .hud-top { top: 16px; left: 16px; right: 16px; }
+.simrest-shell .role-segment { border-radius: 6px; background: #0c1b28; border-color: transparent; }
+.simrest-shell .hud-btn.is-active, .simrest-shell .hud-btn.is-accent { background: #193d6c; border-color: transparent; color: #fff; }
+.simrest-shell .role-segment .hud-btn { min-height: 32px; font-size: 10px; padding: 6px 8px; }
+.simrest-shell .role-segment .hud-btn svg { width: 13px; height: 13px; }
+.simrest-shell .top-tools { display: none; }
+.salon-status { position: absolute; top: 74px; right: 16px; display: flex; gap: 12px; }
+.salon-status > span { display: flex; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 4px; background: #0c1b28; font-size: 11px; white-space: nowrap; }
+.salon-status strong { font-size: 13px; font-weight: 600; }
+.salon-status img, .table-summary-card img { flex: none; display: block; }
+.simrest-shell .scene-info { top: 70px; left: 18px; }
+.simrest-shell .scene-info h1, .simrest-shell .scene-info > p, .simrest-shell .scene-legend { display: none; }
+.simrest-shell .hud-eyebrow { letter-spacing: .5px; font-size: 10px; }
+.simrest-shell .floor-switch { margin-top: 8px; max-width: 230px; }
+.simrest-shell .bottom-stack { left: 16px; right: 16px; bottom: 16px; }
+.simrest-shell .main-actions { display: none; }
+.simrest-shell .context-bar { border-radius: 8px; backdrop-filter: none; box-shadow: 0 6px 20px #0003; }
+.simrest-shell .camera-controls { bottom: 150px; left: 16px; right: auto; border-radius: 6px; }
+.simrest-shell .slide-over { top: 125px; bottom: 150px; right: 31px; border-radius: 8px; background: #0a1927; max-width: calc(100% - var(--sidebar-width) - 62px); }
+.table-summary-card { position: absolute; right: 16px; bottom: 200px; width: 200px; min-height: 260px; max-height: calc(100% - 320px); overflow: auto; padding: 13px; border-radius: 6px; border: 1px solid #7189a499; background: #0a1927; display: flex; align-items: flex-start; flex-direction: column; gap: 8px; pointer-events: auto; font-size: 11px; }
+.table-summary-card h2 { font-size: 16px; font-weight: 400; }.table-summary-card h3 { font-size: 13px; font-weight: 400; }
+.table-summary-card p { display: flex; align-items: center; gap: 7px; line-height: 1.5; }
+.table-summary-card ul { padding-left: 14px; margin: 0; line-height: 1.8; }
+.table-summary-card button { align-self: stretch; margin-top: auto; padding: 9px; border: 0; border-radius: 4px; color: #fff; background: #193d6c; font-size: 11px; }
+.table-status-pill { border-radius: 8px; padding: 2px 14px; background: #1baa82; font-size: 10px; color: #fff; }
+.table-status-pill.is-occupied { background: #d7bb1f; color: #182129; }
+.figma-reference { position: absolute; z-index: 4; }
+.figma-reference > img { width: 100%; height: 100%; object-fit: cover; }
+.figma-reference > span { position: absolute; bottom: 24px; left: 20px; background: #0a1927; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+.showing-reference .hud { pointer-events: none; }.showing-reference .bottom-stack, .showing-reference .camera-controls, .showing-reference .scene-info { display: none; }
+@media (min-width: 1250px) { .salon-status { top: 18px; } }
+@media (max-width: 900px) {
+  .simrest-shell { --sidebar-width: 165px; }
+  .salon-sidebar { padding: 22px 10px; border-radius: 16px; }.simrest-brand { font-size: 25px; }
+  .salon-sidebar .hud-btn { font-size: 12px; padding: 10px 7px; gap: 6px; }
+  .simrest-shell .scene-info { top: 125px; }.table-summary-card { width: 175px; }
+  .simrest-shell .session-note, .simrest-shell .camera-hint { display: none; }
+}
+@media (max-width: 600px) {
+  .salon-sidebar { inset: 8px 8px auto; height: 92px; width: auto; border-radius: 12px; padding: 8px 12px; gap: 4px; }
+  .simrest-brand { font-size: 18px; }.salon-sidebar nav { display: flex; overflow-x: auto; }.salon-sidebar nav .hud-btn { width: auto; flex: none; font-size: 11px; min-height: 34px; }.sidebar-foot { position: absolute; right: 8px; top: 3px; }.sidebar-foot p { display: none; }.sidebar-foot .hud-btn { min-height: 28px; padding: 4px; font-size: 10px; }
+  .simrest-shell > .scene-viewport, .figma-reference { inset: 108px 8px 8px; border-radius: 12px; }
+  .simrest-shell > .hud { inset: 108px 8px 8px; }.simrest-shell .hud-top { inset: 8px 8px auto; }
+  .salon-status { top: 65px; right: 8px; gap: 4px; }.salon-status > span { font-size: 9px; padding: 6px; }
+  .simrest-shell .scene-info { top: 105px; left: 10px; }.simrest-shell .hud-eyebrow { display: none; }
+  .simrest-shell .slide-over { top: 212px; right: 16px; bottom: 178px; width: calc(100% - 32px); max-width: none; }
+  .table-summary-card { right: 8px; bottom: 170px; width: 150px; min-height: 0; max-height: calc(100% - 310px); padding: 10px; gap: 5px; }
+  .table-summary-card ul, .table-summary-card h3 { display: none; }.table-summary-card h2 { font-size: 13px; }
+  .simrest-shell .context-actions { flex-wrap: nowrap; }.simrest-shell .bottom-stack { left: 8px; right: 8px; bottom: 8px; }
+}

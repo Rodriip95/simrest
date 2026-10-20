@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { ComponentRef, Ref } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -9,6 +9,9 @@ import { sessionStore, useSessionStore } from '../../restaurant/state/useSession
 import { DomainError } from '../../restaurant/domain/commands'
 import MovePreview from './MovePreview'
 import SmokeEffect from './SmokeEffect'
+import WaiterCharacter from './WaiterCharacter'
+import DiningFurniture from './DiningFurniture'
+import RestaurantRoom from './RestaurantRoom'
 import SceneLabels, { LabelProjection } from './SceneLabels'
 import type { LabelElements, SceneLabel } from './SceneLabels'
 import { formatVisitDuration, visitDurationMs } from '../../restaurant/domain/visitDuration'
@@ -69,7 +72,6 @@ function SceneContents({ actionsRef, layout, floorId, selectedWaiterId, onSelect
     return new Vector3(13, 15, 16).normalize().multiplyScalar(distance)
   }, [side, size.width, size.height])
   const maxDistance = initialPosition.length() * 2
-  const lines = Array.from({ length: Math.floor(side) + 1 }, (_, i) => i - side / 2)
 
   useEffect(() => {
     camera.position.copy(initialPosition)
@@ -108,49 +110,32 @@ function SceneContents({ actionsRef, layout, floorId, selectedWaiterId, onSelect
 
   return (
     <>
-      <color attach="background" args={['#090f19']} />
-      <ambientLight intensity={1.4} />
-      <directionalLight position={[5, 12, 8]} intensity={2.2} />
-      <mesh position={[0, -0.24, 0]}>
-        <boxGeometry args={[side, 0.45, side]} />
-        <meshStandardMaterial color="#142535" roughness={0.95} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.008, 0]} onClick={event => {
+      <color attach="background" args={['#292934']} />
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[5, 12, 8]} intensity={2.2} color="#ffe2bb" />
+      <RestaurantRoom side={side} onFloorClick={event => {
         if (movingId || event.delta > 5 || event.button !== 0) return
         event.stopPropagation()
         closeMenu()
-      }}>
-        <planeGeometry args={[side, side]} />
-        <meshStandardMaterial color="#142330" roughness={1} />
-      </mesh>
-      {lines.map((coordinate, i) => (
-        <mesh key={`x-${i}`} position={[coordinate, 0, 0]}>
-          <boxGeometry args={[0.012, 0.005, side]} /><meshBasicMaterial color="#263d4e" />
-        </mesh>
-      ))}
-      {lines.map((coordinate, i) => (
-        <mesh key={`z-${i}`} position={[0, 0, coordinate]}>
-          <boxGeometry args={[side, 0.005, 0.012]} /><meshBasicMaterial color="#263d4e" />
-        </mesh>
-      ))}
+      }} />
       {layout.tables.map(table => {
         const visit = selectActiveVisit(state, table.id)
         const showGuests = state.session.activeRole !== 'waiter' || selectAssignment(state, table.id)?.waiterId === state.session.activeWaiterId
-        return <group key={table.id}>
-          <mesh position={[table.x, TABLE_SIZE / 2, table.z]} onClick={event => {
+        if (movingId === table.id) return null
+        return <group key={table.id} position={[table.x, 0, table.z]} onClick={event => {
             event.stopPropagation()
             if (!movingId && event.delta <= 5 && event.button === 0) selectTable(table.id)
           }}>
+          <Suspense fallback={<mesh position={[0, TABLE_SIZE / 2, 0]}>
             <boxGeometry args={[TABLE_SIZE, TABLE_SIZE, TABLE_SIZE]} />
-            <meshStandardMaterial color={visit ? '#c79a65' : '#477e7b'}
-              emissive={table.id === selectedId ? '#39ecff' : '#000000'} emissiveIntensity={0.3} roughness={0.65} />
+            <meshStandardMaterial color="#b88653" />
+          </mesh>}>
+            <DiningFurniture capacity={state.tables[table.id].capacity} customerIds={showGuests ? visit?.customerIds : []} />
+          </Suspense>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
+            <ringGeometry args={[0.73, 0.76, 48]} />
+            <meshBasicMaterial color={table.id === selectedId ? '#39ecff' : visit ? '#c79a65' : '#477e7b'} />
           </mesh>
-          {showGuests && visit?.customerIds.map((id, index) => {
-            const angle = index * Math.PI / 4
-            return <mesh key={id} position={[table.x + Math.cos(angle) * 0.78, 0.16, table.z + Math.sin(angle) * 0.78]} raycast={() => null}>
-              <sphereGeometry args={[0.12, 12, 8]} /><meshStandardMaterial color="#e6d4b4" />
-            </mesh>
-          })}
         </group>
       })}
       {Object.values(state.waiters).filter(waiter => waiter.active && (state.session.activeRole !== 'waiter' || waiter.id === state.session.activeWaiterId)).map((waiter, index) => {
@@ -158,13 +143,18 @@ function SceneContents({ actionsRef, layout, floorId, selectedWaiterId, onSelect
         const placement = presence?.attendingTableId && state.tables[presence.attendingTableId]?.floorId === floorId ? state.placements[presence.attendingTableId] : undefined
         const x = placement ? placement.x + 0.78 : -side / 2 + 0.3 + index * (side - 0.6) / 3
         const z = placement ? placement.z + 0.78 : side / 2 - 0.3
-        return <group key={waiter.id} position={[x, 0.18, z]}>
-          <mesh onClick={event => {
+        return <group key={waiter.id} position={[x, 0.01, z]} onClick={event => {
             event.stopPropagation()
             if (!movingId && event.delta <= 5 && event.button === 0) onSelectWaiter(waiter.id)
           }}>
-            <boxGeometry args={[0.28, 0.28, 0.28]} />
-            <meshStandardMaterial color={waiter.color} emissive={waiter.id === selectedWaiterId ? '#39ecff' : '#000000'} emissiveIntensity={0.5} />
+          <Suspense fallback={<mesh position={[0, 0.18, 0]}>
+            <boxGeometry args={[0.28, 0.28, 0.28]} /><meshStandardMaterial color={waiter.color} />
+          </mesh>}>
+            <WaiterCharacter variant={waiter.id === 'bruno' ? 'male' : 'female'} />
+          </Suspense>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+            <ringGeometry args={[0.2, 0.24, 32]} />
+            <meshBasicMaterial color={waiter.id === selectedWaiterId ? '#39ecff' : waiter.color} />
           </mesh>
         </group>
       })}
@@ -202,7 +192,7 @@ export default function RestaurantScene({ ref, ...props }: SceneProps & { ref: R
     const placement = presence?.attendingTableId && state.tables[presence.attendingTableId]?.floorId === props.floorId ? state.placements[presence.attendingTableId] : undefined
     const x = placement ? placement.x + 0.78 : -side / 2 + 0.3 + index * (side - 0.6) / 3
     const z = placement ? placement.z + 0.78 : side / 2 - 0.3
-    labels.push({ id: waiter.id, position: [x, 0.6, z], kind: 'waiter', text: waiter.name,
+    labels.push({ id: waiter.id, position: [x, 1.05, z], kind: 'waiter', text: waiter.name,
       selected: waiter.id === props.selectedWaiterId, onSelect: () => props.onSelectWaiter(waiter.id) })
   })
   return <>

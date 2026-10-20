@@ -14,7 +14,11 @@ import SlideOver from './features/restaurant/components/hud/SlideOver'
 import HudButton from './features/restaurant/components/hud/HudButton'
 import MetricsPanel from './features/restaurant/components/MetricsPanel'
 import VisitTimer from './features/restaurant/components/VisitTimer'
+import SalonSidebar from './features/restaurant/components/hud/SalonSidebar'
+import SalonStatus from './features/restaurant/components/hud/SalonStatus'
+import TableSummaryCard from './features/restaurant/components/hud/TableSummaryCard'
 import './App.css'
+import './features/restaurant/components/hud/figma-theme.css'
 
 export type TableAction = 'detail' | 'guests' | 'assignment' | 'orders' | 'move'
 type PanelId = 'tables' | 'build' | 'waiters' | 'metrics' | TableAction
@@ -32,6 +36,7 @@ function Salon() {
   const [waiterId, setWaiterId] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [notice, setNotice] = useState('')
+  const [reference, setReference] = useState(false)
   const [now, setNow] = useState(session.startedAt)
   const selected = transient.selectedTableId ? tables[transient.selectedTableId] : undefined
   const waiter = waiterId ? state.waiters[waiterId] : undefined
@@ -106,8 +111,10 @@ function Salon() {
     } catch { setNotice('El navegador no permite pantalla completa. El salón sigue ocupando toda la ventana.') }
   }
 
-  return <main className="hud-shell">
-    <div ref={viewport} className="scene-viewport" tabIndex={0}
+  return <main className={`hud-shell simrest-shell${reference ? ' showing-reference' : ''}`}>
+    <SalonSidebar active={panel} admin={session.activeRole === 'admin'} reference={reference}
+      onNavigate={openPanel} onToggleReference={() => { state.cancelMove(); setReference(value => !value) }} />
+    <div id="salon" ref={viewport} className="scene-viewport" tabIndex={0} inert={reference} aria-hidden={reference}
       aria-label="Salón 3D. Tocá una mesa o un mozo. Flechas para desplazar, más y menos para zoom, cero para centrar."
       onKeyDown={event => {
         if (event.target !== event.currentTarget) return
@@ -122,14 +129,16 @@ function Salon() {
       <SceneBoundary><RestaurantScene ref={scene} layout={layout} floorId={activeFloor.id} now={now} selectedWaiterId={waiterId}
         onSelectWaiter={selectWaiter} onSelectTable={() => { setWaiterId(null); setPanel(null) }} /></SceneBoundary>
     </div>
+    {reference && <div className="figma-reference"><img src="/figma/cafe-reference.png" alt="Referencia de Figma: cafetería cálida en vista isométrica" /><span>Referencia visual · Volvé al salón 3D para interactuar</span></div>}
     <div className="hud">
       <header className="hud-top">
-        <div className="brand"><span className="brand-mark">r.</span><div>restaurant<span className="brand-light">sim</span><small>SALÓN INTERACTIVO</small></div></div>
         <RoleNavigation />
         <div className="top-tools"><span className="demo-badge"><i /> Demo local</span>
           {document.fullscreenEnabled && <HudButton icon={fullscreen ? Minimize : Maximize} label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'} iconOnly onClick={toggleFullscreen} />}
         </div>
       </header>
+      <SalonStatus occupied={occupied} total={layout.tables.length} now={now} />
+      {selected && !moving && !visiblePanel && !reference && <TableSummaryCard tableId={selected.id} now={now} onDetails={() => openPanel('detail')} />}
       <div className="scene-info"><span className="hud-eyebrow">VISTA DEL SALÓN / {activeFloor.name.toLocaleUpperCase('es-AR')}</span><h1>Todo pasa en la sala.</h1>
         <p>{layout.tables.length} mesas <span>·</span> {occupied} ocupadas <span>·</span> {layout.area} m²</p>
         <nav className="floor-switch" aria-label="Pisos del salón">{orderedFloors.map(floor => <button key={floor.id} type="button" aria-current={floor.id === activeFloor.id ? 'page' : undefined} onClick={() => changeFloor(floor.id)}>{floor.name}</button>)}</nav>
